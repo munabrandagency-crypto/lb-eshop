@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Démo — Boutique sur-mesure</title>
+  <link rel="stylesheet" href="boutique-styles.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 3rem 1.5rem;
+      max-width: 1100px;
+      margin-inline: auto;
+      background: #fffdf9;
+    }
+    h1 {
+      font-family: "Fraunces", serif;
+      font-weight: 500;
+    }
+    p.instructions {
+      font-family: "Work Sans", sans-serif;
+      color: #8a7b68;
+      max-width: 60ch;
+    }
+  </style>
+</head>
+<body>
+  <h1>Notre collection</h1>
+  <p class="instructions">
+    Cette page sert uniquement à tester le moteur en local avant de l'intégrer
+    dans Nicepage. Renseignez un vrai <code>sheetIdProduits</code> dans
+    boutique-config.js pour voir le catalogue se charger ci-dessous.
+  </p>
+
+  <!-- C'est CE conteneur vide que vous replacerez dans Nicepage -->
+  <div id="bq-catalogue"></div>
+
+  <script 
+Boutique config · JS
+/* ==========================================================================
+   CONFIGURATION DE LA BOUTIQUE
+   ==========================================================================
+   C'est le SEUL fichier que vous devrez modifier pour faire vivre le site :
+   nouveau numéro WhatsApp, changement de feuille Google Sheets, etc.
+   Ne touchez à rien d'autre que les valeurs entre guillemets ci-dessous.
+   ========================================================================== */
+ 
+window.BOUTIQUE_CONFIG = {
+ 
+  /* --- Catalogue (Google Sheet "Produits") ---------------------------------
+     L'ID se trouve dans l'URL de votre feuille Google Sheets :
+     https://docs.google.com/spreadsheets/d/CET_ID_ICI/edit
+  --------------------------------------------------------------------------- */
+  sheetIdProduits: "1ttmyEa1-Jp-Z1mPY85dEWftVv6y8cOGoBu7rYB9afd8",
+  sheetNameProduits: "Produits",
+ 
+  /* --- Commandes (Google Apps Script relié à la feuille "Commandes") ------
+     URL obtenue après déploiement du script en "Application Web".
+     Doit se terminer par /exec
+  --------------------------------------------------------------------------- */
+  ordersWebhookUrl: "https://script.google.com/macros/s/AKfycbywdFWyHIvJwGQK5EyaQloxlctJg19cYzfA813GkKWLSAUy9ekRdN6YXkNaFtbokcbovw/exec",
+ 
+  /* Doit être IDENTIQUE à la valeur SECRET_PARTAGE dans le fichier Code.gs */
+  ordersSecret: "nakama1210",
+ 
+  /* --- WhatsApp -------------------------------------------------------------
+     Format international, sans "+", sans espaces.
+     Exemple Cameroun : 237650068716
+  --------------------------------------------------------------------------- */
+  whatsappNumber: "237650068716",
+ 
+  /* --- Meta Pixel -------------------------------------------------------------
+     Laissez la chaîne vide "" pour désactiver le suivi publicitaire.
+  --------------------------------------------------------------------------- */
+  metaPixelId: "",
+ 
+  /* --- Textes ---------------------------------------------------------------- */
+  currencyLabel: "FCFA",
+  whatsappIntro: "Bonjour, je souhaite passer une commande:",
+  depositNote: "Un acompte de 50% est demandé pour lancer la confection.",
+  measurementsNote: "Je vous envoie juste après mes mensurations et une photo entière pour la coupe.",
+};
+ 
+></script>
+  <script /* ==========================================================================
+   MOTEUR DE LA BOUTIQUE — NE PAS MODIFIER
+   ==========================================================================
+   Toute la logique vit ici : personne n'a besoin d'y toucher pour ajouter
+   un produit, changer un prix ou changer le numéro WhatsApp — tout ça se
+   passe dans boutique-config.js et dans la feuille Google Sheets "Produits".
+   ========================================================================== */
+
+(function () {
+  "use strict";
+
+  var CONFIG = window.BOUTIQUE_CONFIG || {};
+  var CART_KEY = "boutique_panier_v1";
+  var CONSENT_KEY = "boutique_consentement_mesure";
+
+  var state = {
+    products: [],
+    activeCategory: "Tout",
+    cart: [],
+  };
+
+  /* ------------------------------------------------------------------ *
+   *  UTILITAIRES
+   * ------------------------------------------------------------------ */
+
+  function escapeHtml(value) {
+    var div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
+
+  function formatPrice(value) {
+    var num = Number(value) || 0;
+    var formatted = num.toLocaleString("fr-FR");
+    return formatted + " " + (CONFIG.currencyLabel || "FCFA");
+  }
+
+  function getCart() {
+    try {
+      var raw = localStorage.getItem(CART_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveCart(cart) {
+    state.cart = cart;
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    } catch (err) {
+      /* stockage indisponible (navigation privée par ex.) : on continue
+         quand même, le panier vivra le temps de la session en mémoire */
+    }
+    updateBadge();
+    renderDrawerItems();
+  }
+
+  function cartCount(cart) {
+    return cart.reduce(function (total, item) {
+      return total + item.quantite;
+    }, 0);
+  }
+
+  function cartTotal(cart) {
+    return cart.reduce(function (total, item) {
+      return total + item.quantite * item.prix;
+    }, 0);
+  }
+
+  function hasConsent() {
+    return localStorage.getItem(CONSENT_KEY) === "oui";
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  SUIVI PUBLICITAIRE (PIXEL META)
+   * ------------------------------------------------------------------ */
+
+  function loadMetaPixel() {
+    if (!CONFIG.metaPixelId || window.fbq) return;
+    /* eslint-disable */
+    !(function (f, b, e, v, n, t, s) {
+      if (f.fbq) return;
+      n = f.fbq = function () {
+        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+      };
+      if (!f._fbq) f._fbq = n;
+      n.push = n;
+      n.loaded = !0;
+      n.version = "2.0";
+      n.queue = [];
+      t = b.createElement(e);
+      t.async = !0;
+      t.src = v;
+      s = b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t, s);
+    })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
+    /* eslint-enable */
+    window.fbq("init", CONFIG.metaPixelId);
+    window.fbq("track", "PageView");
+  }
+
+  function trackEvent(name, params) {
+    if (!hasConsent() || !window.fbq) return;
+    window.fbq("track", name, params || {});
+  }
+
+  function initConsentBanner() {
+    if (!CONFIG.metaPixelId) return; // pas de pixel configuré = pas de bannière
+    var existing = localStorage.getItem(CONSENT_KEY);
+    if (existing) {
+      if (existing === "oui") loadMetaPixel();
+      return;
+    }
+    var banner = document.createElement("div");
+    banner.className = "bq-consent";
+    banner.innerHTML =
+      '<p class="bq-consent__text">Nous utilisons des outils de mesure pour mieux vous présenter nos collections. Vous pouvez accepter ou refuser.</p>' +
+      '<div class="bq-consent__actions">' +
+      '<button type="button" class="bq-btn bq-btn--ghost" data-consent="non">Refuser</button>' +
+      '<button type="button" class="bq-btn bq-btn--solid" data-consent="oui">Accepter</button>' +
+      "</div>";
+    document.body.appendChild(banner);
+
+    banner.addEventListener("click", function (event) {
+      var target = event.target.closest("[data-consent]");
+      if (!target) return;
+      var choice = target.getAttribute("data-consent");
+      localStorage.setItem(CONSENT_KEY, choice);
+      if (choice === "oui") loadMetaPixel();
+      banner.remove();
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  LECTURE DU CATALOGUE (GOOGLE SHEETS)
+   * ------------------------------------------------------------------ */
+
+  function buildGvizUrl() {
+    return (
+      "https://docs.google.com/spreadsheets/d/" +
+      encodeURIComponent(CONFIG.sheetIdProduits) +
+      "/gviz/tq?tqx=out:json&headers=1&sheet=" +
+      encodeURIComponent(CONFIG.sheetNameProduits || "Produits")
+    );
+  }
+
+  function parseGvizResponse(text) {
+    var start = text.indexOf("{");
+    var end = text.lastIndexOf("}");
+    var json = JSON.parse(text.substring(start, end + 1));
+    var cols = json.table.cols.map(function (col) {
+      return (col.label || "").trim().toLowerCase();
+    });
+    var rows = json.table.rows || [];
+    return rows.map(function (row) {
+      var product = {};
+      row.c.forEach(function (cell, index) {
+        var key = cols[index];
+        if (!key) return;
+        product[key] = cell ? cell.v : "";
+      });
+      return product;
+    });
+  }
+
+  function fetchProducts() {
+    return fetch(buildGvizUrl())
+      .then(function (res) {
+        return res.text();
+      })
+      .then(parseGvizResponse)
+      .then(function (rows) {
+        return rows.filter(function (p) {
+          return String(p.disponible || "").trim().toLowerCase() === "oui";
+        });
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  AFFICHAGE DU CATALOGUE
+   * ------------------------------------------------------------------ */
+
+  function getCatalogueRoot() {
+    return document.getElementById("bq-catalogue");
+  }
+
+  function renderSkeleton(root) {
+    var cards = "";
+    for (var i = 0; i < 6; i++) {
+      cards += '<div class="bq-card bq-card--skeleton"></div>';
+    }
+    root.innerHTML = '<div class="bq-grid">' + cards + "</div>";
+  }
+
+  function uniqueCategories(products) {
+    var set = {};
+    products.forEach(function (p) {
+      if (p.categorie) set[p.categorie] = true;
+    });
+    return Object.keys(set);
+  }
+
+  function renderTabs(root, categories) {
+    if (categories.length < 2) return "";
+    var tabs = ['<button type="button" class="bq-tab is-active" data-category="Tout">Tout</button>'];
+    categories.forEach(function (cat) {
+      tabs.push(
+        '<button type="button" class="bq-tab" data-category="' +
+          escapeHtml(cat) +
+          '">' +
+          escapeHtml(cat) +
+          "</button>"
+      );
+    });
+    return '<div class="bq-tabs">' + tabs.join("") + "</div>";
+  }
+
+  function renderCard(product) {
+    return (
+      '<article class="bq-card">' +
+      '<div class="bq-card__frame">' +
+      '<img class="bq-card__img" src="' +
+      escapeHtml(product.image_url) +
+      '" alt="' +
+      escapeHtml(product.nom) +
+      '" loading="lazy">' +
+      "</div>" +
+      '<div class="bq-card__body">' +
+      '<h3 class="bq-card__name">' +
+      escapeHtml(product.nom) +
+      "</h3>" +
+      '<p class="bq-card__price">' +
+      formatPrice(product.prix) +
+      "</p>" +
+      '<button type="button" class="bq-btn bq-btn--ghost bq-card__action" data-action="add-to-cart" data-id="' +
+      escapeHtml(product.id) +
+      '">Ajouter au panier</button>' +
+      "</div>" +
+      "</article>"
+    );
+  }
+
+  function renderGrid(root) {
+    var visible = state.products.filter(function (p) {
+      return state.activeCategory === "Tout" || p.categorie === state.activeCategory;
+    });
+
+    var grid = document.createElement("div");
+    grid.className = "bq-grid";
+
+    if (!visible.length) {
+      grid.innerHTML = '<p class="bq-empty">Aucun modèle disponible dans cette catégorie pour le moment.</p>';
+    } else {
+      grid.innerHTML = visible.map(renderCard).join("");
+    }
+
+    var existingGrid = root.querySelector(".bq-grid");
+    if (existingGrid) {
+      existingGrid.replaceWith(grid);
+    } else {
+      root.appendChild(grid);
+    }
+  }
+
+  function renderCatalogue() {
+    var root = getCatalogueRoot();
+    if (!root) return;
+
+    var categories = uniqueCategories(state.products);
+    var tabsHtml = renderTabs(root, categories);
+    root.innerHTML = tabsHtml;
+    renderGrid(root);
+
+    var tabsEl = root.querySelector(".bq-tabs");
+    if (tabsEl) {
+      tabsEl.addEventListener("click", function (event) {
+        var btn = event.target.closest("[data-category]");
+        if (!btn) return;
+        state.activeCategory = btn.getAttribute("data-category");
+        tabsEl.querySelectorAll(".bq-tab").forEach(function (t) {
+          t.classList.toggle("is-active", t === btn);
+        });
+        renderGrid(root);
+      });
+    }
+  }
+
+  function initCatalogue() {
+    var root = getCatalogueRoot();
+    if (!root) return; // page sans catalogue : on ne fait rien
+
+    renderSkeleton(root);
+
+    fetchProducts()
+      .then(function (products) {
+        state.products = products;
+        renderCatalogue();
+      })
+      .catch(function () {
+        root.innerHTML =
+          '<p class="bq-empty">La collection ne se charge pas pour le moment. Merci de réessayer dans un instant.</p>';
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  PANIER, BOUTON FLOTTANT ET TIROIR
+   * ------------------------------------------------------------------ */
+
+  function addToCart(id, nom, prix) {
+    var cart = getCart();
+    var existing = cart.find(function (item) {
+      return item.id === id;
+    });
+    if (existing) {
+      existing.quantite += 1;
+    } else {
+      cart.push({ id: id, nom: nom, prix: Number(prix) || 0, quantite: 1 });
+    }
+    saveCart(cart);
+    trackEvent("AddToCart", {
+      content_ids: [id],
+      content_name: nom,
+      value: Number(prix) || 0,
+      currency: "XAF",
+    });
+    openDrawer();
+  }
+
+  function changeQuantity(id, delta) {
+    var cart = getCart();
+    var item = cart.find(function (i) {
+      return i.id === id;
+    });
+    if (!item) return;
+    item.quantite += delta;
+    if (item.quantite <= 0) {
+      cart = cart.filter(function (i) {
+        return i.id !== id;
+      });
+    }
+    saveCart(cart);
+  }
+
+  function removeFromCart(id) {
+    saveCart(
+      getCart().filter(function (i) {
+        return i.id !== id;
+      })
+    );
+  }
+
+  function clearCart() {
+    saveCart([]);
+  }
+
+  function updateBadge() {
+    var badge = document.querySelector(".bq-fab__badge");
+    if (!badge) return;
+    var count = cartCount(getCart());
+    badge.textContent = String(count);
+    badge.style.display = count > 0 ? "flex" : "none";
+  }
+
+  function renderLineItem(item) {
+    return (
+      '<li class="bq-line" data-id="' +
+      escapeHtml(item.id) +
+      '">' +
+      '<div class="bq-line__info">' +
+      '<p class="bq-line__name">' +
+      escapeHtml(item.nom) +
+      "</p>" +
+      '<p class="bq-line__price">' +
+      formatPrice(item.prix) +
+      "</p>" +
+      "</div>" +
+      '<div class="bq-stepper">' +
+      '<button type="button" class="bq-stepper__btn" data-action="decrease" data-id="' +
+      escapeHtml(item.id) +
+      '" aria-label="Retirer un exemplaire">–</button>' +
+      '<span class="bq-stepper__value">' +
+      item.quantite +
+      "</span>" +
+      '<button type="button" class="bq-stepper__btn" data-action="increase" data-id="' +
+      escapeHtml(item.id) +
+      '" aria-label="Ajouter un exemplaire">+</button>' +
+      "</div>" +
+      '<button type="button" class="bq-line__remove" data-action="remove" data-id="' +
+      escapeHtml(item.id) +
+      '" aria-label="Retirer cet article">×</button>' +
+      "</li>"
+    );
+  }
+
+  function renderDrawerItems() {
+    var list = document.querySelector(".bq-drawer__items");
+    var totalEl = document.querySelector(".bq-drawer__total-value");
+    var submitBtn = document.querySelector(".bq-drawer__submit");
+    if (!list) return;
+
+    var cart = getCart();
+
+    if (!cart.length) {
+      list.innerHTML =
+        '<p class="bq-empty">Votre panier est vide pour l\'instant.<br>Découvrez la collection et composez votre sélection.</p>';
+    } else {
+      list.innerHTML = '<ul class="bq-line-list">' + cart.map(renderLineItem).join("") + "</ul>";
+    }
+
+    if (totalEl) totalEl.textContent = formatPrice(cartTotal(cart));
+    if (submitBtn) submitBtn.disabled = cart.length === 0;
+  }
+
+  function openDrawer() {
+    document.querySelector(".bq-drawer").classList.add("is-open");
+    document.querySelector(".bq-overlay").classList.add("is-open");
+    document.body.classList.add("bq-no-scroll");
+  }
+
+  function closeDrawer() {
+    document.querySelector(".bq-drawer").classList.remove("is-open");
+    document.querySelector(".bq-overlay").classList.remove("is-open");
+    document.body.classList.remove("bq-no-scroll");
+  }
+
+  function buildFab() {
+    var fab = document.createElement("button");
+    fab.type = "button";
+    fab.className = "bq-fab";
+    fab.setAttribute("aria-label", "Voir mon panier");
+    fab.innerHTML =
+      '<svg class="bq-fab__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M4 6h16l-1.5 10.5a2 2 0 0 1-2 1.5H7.5a2 2 0 0 1-2-1.5L4 6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '<path d="M8 6V5a4 4 0 0 1 8 0v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
+      "</svg>" +
+      '<span class="bq-fab__badge">0</span>';
+    fab.addEventListener("click", openDrawer);
+    document.body.appendChild(fab);
+  }
+
+  function buildDrawer() {
+    var overlay = document.createElement("div");
+    overlay.className = "bq-overlay";
+    overlay.addEventListener("click", closeDrawer);
+
+    var drawer = document.createElement("aside");
+    drawer.className = "bq-drawer";
+    drawer.innerHTML =
+      '<div class="bq-drawer__header">' +
+      "<h2>Votre sélection</h2>" +
+      '<button type="button" class="bq-drawer__close" aria-label="Fermer le panier">×</button>' +
+      "</div>" +
+      '<div class="bq-drawer__items"></div>' +
+      '<form class="bq-drawer__form">' +
+      '<div class="bq-field">' +
+      '<label for="bq-nom">Nom</label>' +
+      '<input type="text" id="bq-nom" name="nom" required autocomplete="name">' +
+      "</div>" +
+      '<div class="bq-field">' +
+      '<label for="bq-telephone">Téléphone</label>' +
+      '<input type="tel" id="bq-telephone" name="telephone" required autocomplete="tel" placeholder="6XX XX XX XX">' +
+      "</div>" +
+      '<div class="bq-field">' +
+      '<label for="bq-email">Email (facultatif)</label>' +
+      '<input type="email" id="bq-email" name="email" autocomplete="email">' +
+      "</div>" +
+      '<label class="bq-checkbox">' +
+      '<input type="checkbox" name="consentement" required>' +
+      "<span>J'accepte que ces informations soient transmises à la boutique via WhatsApp pour traiter ma commande.</span>" +
+      "</label>" +
+      '<label class="bq-checkbox">' +
+      '<input type="checkbox" name="marketing">' +
+      "<span>J'accepte de recevoir les offres et nouveautés de la boutique.</span>" +
+      "</label>" +
+      '<p class="bq-form-error" hidden></p>' +
+      '<div class="bq-drawer__footer">' +
+      '<div class="bq-drawer__total"><span>Total</span><span class="bq-drawer__total-value">0 FCFA</span></div>' +
+      '<button type="submit" class="bq-btn bq-btn--solid bq-drawer__submit" disabled>Passer la commande</button>' +
+      "</div>" +
+      "</form>";
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(drawer);
+
+    drawer.querySelector(".bq-drawer__close").addEventListener("click", closeDrawer);
+
+    drawer.querySelector(".bq-drawer__items").addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-action]");
+      if (!btn) return;
+      var id = btn.getAttribute("data-id");
+      var action = btn.getAttribute("data-action");
+      if (action === "increase") changeQuantity(id, 1);
+      if (action === "decrease") changeQuantity(id, -1);
+      if (action === "remove") removeFromCart(id);
+    });
+
+    drawer.querySelector(".bq-drawer__form").addEventListener("submit", handleCheckoutSubmit);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  VALIDATION DE LA COMMANDE
+   * ------------------------------------------------------------------ */
+
+  function showFormError(message) {
+    var errorEl = document.querySelector(".bq-form-error");
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.hidden = !message;
+  }
+
+  function buildWhatsAppMessage(formData, cart, total) {
+    var lines = cart.map(function (item) {
+      return "• " + item.nom + " — " + item.quantite + " x " + formatPrice(item.prix);
+    });
+    return [
+      CONFIG.whatsappIntro,
+      "",
+      "Nom : " + formData.nom,
+    ]
+      .concat(lines)
+      .concat(["", "Total : " + formatPrice(total), "", CONFIG.depositNote, CONFIG.measurementsNote])
+      .join("\n");
+  }
+
+  function sendOrderToSheet(formData, cart, total) {
+    if (!CONFIG.ordersWebhookUrl || CONFIG.ordersWebhookUrl.indexOf("COLLEZ_ICI") === 0) {
+      return; // pas encore configuré : on n'essaie pas d'envoyer
+    }
+    var detail = cart
+      .map(function (item) {
+        return item.nom + " x" + item.quantite + " (" + formatPrice(item.prix) + ")";
+      })
+      .join(" | ");
+
+    var payload = {
+      secret: CONFIG.ordersSecret,
+      nom: formData.nom,
+      telephone: formData.telephone,
+      email: formData.email || "",
+      detailCommande: detail,
+      total: total,
+      consentementMarketing: formData.marketing ? "oui" : "non",
+    };
+
+    fetch(CONFIG.ordersWebhookUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    }).catch(function () {
+      /* si Google Sheets ne répond pas, la commande reste malgré tout
+         validée par WhatsApp : ce n'est jamais bloquant pour la cliente */
+    });
+  }
+
+  function handleCheckoutSubmit(event) {
+    event.preventDefault();
+    showFormError("");
+
+    var form = event.target;
+    var formData = {
+      nom: form.nom.value.trim(),
+      telephone: form.telephone.value.trim(),
+      email: form.email.value.trim(),
+      consentement: form.consentement.checked,
+      marketing: form.marketing.checked,
+    };
+
+    if (!formData.nom) {
+      showFormError("Merci d'indiquer votre nom pour continuer.");
+      return;
+    }
+    if (!formData.telephone) {
+      showFormError("Merci d'indiquer votre numéro de téléphone.");
+      return;
+    }
+    if (!formData.consentement) {
+      showFormError("Merci d'accepter la transmission de vos informations pour valider la commande.");
+      return;
+    }
+
+    var cart = getCart();
+    if (!cart.length) {
+      showFormError("Votre panier est vide.");
+      return;
+    }
+
+    var total = cartTotal(cart);
+
+    trackEvent("InitiateCheckout", {
+      value: total,
+      currency: "XAF",
+      num_items: cartCount(cart),
+    });
+
+    sendOrderToSheet(formData, cart, total);
+    trackEvent("Lead");
+
+    var message = buildWhatsAppMessage(formData, cart, total);
+    var waUrl = "https://wa.me/" + CONFIG.whatsappNumber + "?text=" + encodeURIComponent(message);
+
+    clearCart();
+    closeDrawer();
+
+    var newTab = window.open(waUrl, "_blank");
+    if (!newTab) {
+      window.location.href = waUrl;
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  DÉLÉGATION DES CLICS "AJOUTER AU PANIER"
+   * ------------------------------------------------------------------ */
+
+  function initGlobalClicks() {
+    document.addEventListener("click", function (event) {
+      var btn = event.target.closest('[data-action="add-to-cart"]');
+      if (!btn) return;
+      var id = btn.getAttribute("data-id");
+      var product = state.products.find(function (p) {
+        return p.id === id;
+      });
+      if (!product) return;
+      addToCart(product.id, product.nom, product.prix);
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  DÉMARRAGE
+   * ------------------------------------------------------------------ */
+
+  function init() {
+    state.cart = getCart();
+    buildFab();
+    buildDrawer();
+    updateBadge();
+    renderDrawerItems();
+    initGlobalClicks();
+    initCatalogue();
+    initConsentBanner();
+    if (hasConsent()) loadMetaPixel();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+></script>
+</body>
+</html>
