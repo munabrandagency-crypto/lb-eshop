@@ -7,7 +7,7 @@
   "use strict";
 
   var C = window.BOUTIQUE_CONFIG || {};
-  var KEYS = { cart: "boutique_panier_v2", fav: "boutique_favoris_v1", consent: "boutique_consentement_mesure" };
+  var KEYS = { cart: "boutique_panier_v2", fav: "boutique_favoris_v1", consent: "boutique_consentement_mesure", lead: "boutique_demande_id" };
   var ASK = "Prix sur demande";
 
   var state = {
@@ -360,7 +360,7 @@
         '<div class="field"><label for="f-mail">Email (facultatif)</label>' +
           '<input id="f-mail" name="email" type="email" autocomplete="email"></div>' +
         '<label class="check"><input type="checkbox" name="consentement" required>' +
-          "<span>J'accepte que ces informations soient transmises à la boutique pour traiter ma commande.</span></label>" +
+          "<span>J'accepte que la boutique enregistre ces informations et me recontacte sur WhatsApp au sujet de ma sélection.</span></label>" +
         '<label class="check"><input type="checkbox" name="marketing">' +
           "<span>J'accepte de recevoir les nouveautés et offres de la boutique (facultatif).</span></label>" +
         '<p class="form-error" role="alert" hidden></p>' +
@@ -368,6 +368,7 @@
       "</form>";
 
     restoreForm(prev);
+    scheduleLead();
   }
 
   /* Les champs déjà remplis survivent à un changement de quantité */
@@ -415,11 +416,51 @@
       .join("\n");
   }
 
-  function sendOrder(form) {
+  /* Identifiant de la demande : la même ligne de la feuille Commandes est mise à jour
+     quand la cliente passe de "prospect" à "commande envoyée" */
+  function leadId() {
+    var id = rawGet(KEYS.lead);
+    if (!id) {
+      id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      rawSet(KEYS.lead, id);
+    }
+    return id;
+  }
+
+  /* Enregistrement du prospect : uniquement quand nom + téléphone sont valides
+     ET que la case d'accord est cochée. Rien n'est envoyé avant cet accord. */
+  var lastLeadSig = "";
+  var leadTimer;
+  function scheduleLead() {
+    clearTimeout(leadTimer);
+    leadTimer = setTimeout(function () {
+      var form = readForm();
+      if (!form) return;
+      /* accord retiré après enregistrement : on demande la suppression du prospect */
+      if (!form.consentement && lastLeadSig) {
+        lastLeadSig = "";
+        sendOrder({ nom: "", telephone: "", email: "", marketing: false }, "retrait");
+        return;
+      }
+      if (!form.consentement || !form.nom.trim() || !validPhone(form.telephone) || !state.cart.length) return;
+      var clean = {
+        nom: form.nom.trim(), telephone: form.telephone.trim(), email: form.email.trim(),
+        marketing: form.marketing,
+      };
+      var sig = JSON.stringify([clean, state.cart]);
+      if (sig === lastLeadSig) return;
+      lastLeadSig = sig;
+      sendOrder(clean, "prospect");
+    }, 1200);
+  }
+
+  function sendOrder(form, statut) {
     var url = C.ordersWebhookUrl;
     if (!url || url.indexOf("COLLEZ_ICI") === 0) return;
     var body = JSON.stringify({
       secret: C.ordersSecret,
+      id: leadId(),
+      statut: statut || "commande",
       nom: form.nom,
       telephone: form.telephone,
       email: form.email || "",
@@ -467,7 +508,10 @@
 
     var total = cartTotal();
     track("InitiateCheckout", { value: total, currency: "XAF", num_items: cartCount() });
-    sendOrder(form);
+    clearTimeout(leadTimer);
+    sendOrder(form, "commande");
+    rawSet(KEYS.lead, "");          /* prochaine sélection = nouvelle ligne */
+    lastLeadSig = "";
 
     var waUrl = "https://wa.me/" + C.whatsappNumber + "?text=" + encodeURIComponent(waMessage(form));
     track("Lead", { value: total, currency: "XAF" });
@@ -742,6 +786,13 @@
       if (t.closest("[data-open-privacy]")) { openSheet("privacy"); return; }
       if (t.closest("[data-bq-consent-manage]")) { showConsent(); return; }
       if (t.closest("[data-retry]")) { start(); return; }
+    });
+
+    /* prospect : suivi des saisies dans le formulaire du panier */
+    ["input", "change"].forEach(function (type) {
+      document.addEventListener(type, function (ev) {
+        if (ev.target.closest && ev.target.closest(".checkout")) scheduleLead();
+      });
     });
 
     document.addEventListener("submit", function (ev) {
