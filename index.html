@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FAF6EF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="description" content="Couture sur-mesure pour femmes. Choisissez vos modèles et commandez sur WhatsApp.">
+  <title>Boutique sur-mesure</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Aller au contenu</a>
+
+  <header class="top">
+    <a class="brand" href="#" data-nav="accueil">
+      <span class="brand__name" data-shop-name>Boutique</span>
+    </a>
+    <p class="brand__tagline" data-shop-tagline></p>
+  </header>
+
+  <main id="main">
+    <!-- ACCUEIL -------------------------------------------------------- -->
+    <section class="view is-active" data-view="accueil" aria-label="Collection">
+      <div class="hero">
+        <h1 class="hero__title" data-hero-title></h1>
+        <p class="hero__text" data-hero-text></p>
+        <ol class="steps">
+          <li><span class="steps__n">1</span>Choisissez vos modèles</li>
+          <li><span class="steps__n">2</span>Validez sur WhatsApp</li>
+          <li><span class="steps__n">3</span>Envoyez vos mensurations</li>
+        </ol>
+      </div>
+
+      <div class="ruler" aria-hidden="true"></div>
+
+      <nav class="pills" aria-label="Catégories"></nav>
+      <div class="grid" data-grid="catalogue" aria-live="polite"></div>
+    </section>
+
+    <!-- FAVORIS -------------------------------------------------------- -->
+    <section class="view" data-view="favoris" aria-label="Favoris" hidden>
+      <div class="view__head">
+        <h1 class="view__title">Vos favoris</h1>
+      </div>
+      <div class="grid" data-grid="favoris"></div>
+    </section>
+
+    <!-- PANIER --------------------------------------------------------- -->
+    <section class="view" data-view="panier" aria-label="Panier" hidden>
+      <div class="view__head">
+        <h1 class="view__title">Votre panier</h1>
+      </div>
+      <div class="cart"></div>
+    </section>
+
+    <footer class="foot">
+      <p data-shop-name-foot></p>
+      <p class="foot__links">
+        <button type="button" class="linkish" data-open-privacy>Confidentialité</button>
+        <button type="button" class="linkish" data-bq-consent-manage hidden>Gérer mes cookies</button>
+      </p>
+    </footer>
+  </main>
+
+  <!-- BARRE FLOTTANTE "LIQUID GLASS" ------------------------------------ -->
+  <nav class="dock" aria-label="Navigation principale">
+    <span class="dock__indicator" aria-hidden="true"></span>
+    <a class="dock__item is-active" href="#" data-nav="accueil" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z"/></svg>
+      <span>Accueil</span>
+    </a>
+    <a class="dock__item" href="#favoris" data-nav="favoris">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/></svg>
+      <span>Favoris</span>
+      <b class="dock__badge" data-badge="favoris" hidden>0</b>
+    </a>
+    <a class="dock__item" href="#panier" data-nav="panier">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.3 10.4A2 2 0 0 1 15.7 20H8.3a2 2 0 0 1-2-1.6L5 8Z"/><path d="M9 8V7a3 3 0 0 1 6 0v1"/></svg>
+      <span>Panier</span>
+      <b class="dock__badge" data-badge="panier" hidden>0</b>
+    </a>
+  </nav>
+
+  <!-- FICHE PRODUIT ------------------------------------------------------ -->
+  <div class="sheet" data-sheet="produit" hidden>
+    <div class="sheet__backdrop" data-close-sheet></div>
+    <div class="sheet__panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <button type="button" class="sheet__close" data-close-sheet aria-label="Fermer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <div class="sheet__body"></div>
+    </div>
+  </div>
+
+  <!-- CONFIDENTIALITÉ ----------------------------------------------------- -->
+  <div class="sheet" data-sheet="privacy" hidden>
+    <div class="sheet__backdrop" data-close-sheet></div>
+    <div class="sheet__panel sheet__panel--text" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+      <button type="button" class="sheet__close" data-close-sheet aria-label="Fermer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <div class="prose">
+        <h2 id="privacy-title">Vos données</h2>
+        <p>Quand vous passez commande, nous enregistrons votre nom, votre téléphone, votre email s'il est renseigné et le détail de la commande. Ces informations servent uniquement à traiter votre commande et à vous recontacter sur WhatsApp.</p>
+        <p>Si vous cochez la case dédiée, nous pourrons aussi vous envoyer nos nouveautés. Vous pouvez retirer cet accord à tout moment en nous écrivant sur WhatsApp.</p>
+        <p>Vos données ne sont ni vendues ni partagées. Pour les consulter, les corriger ou les faire supprimer, écrivez-nous sur WhatsApp.</p>
+        <p>Votre panier et vos favoris restent enregistrés sur votre téléphone uniquement.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
