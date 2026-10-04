@@ -12,7 +12,7 @@ window.BOUTIQUE_CONFIG = {
   shopName: "LB eShop",
   tagline: "Couture sur-mesure pour femmes, au Cameroun",
   heroTitle: "Des pièces coupées à vos mesures",
-  heroText: "Choisissez vos modèles, envoyez la commande sur WhatsApp, puis vos mensurations. La confection démarre dès l'acompte reçu.",
+  heroText: "Choisissez vos modèles et envoyez votre sélection sur WhatsApp. La boutique vous guide ensuite pour les mensurations, puis lance la confection.",
 
   /* --- Catalogue (Google Sheet "Produits") -------------------------------
      L'ID se trouve dans l'URL : https://docs.google.com/spreadsheets/d/CET_ID/edit */
@@ -34,7 +34,10 @@ window.BOUTIQUE_CONFIG = {
 
   /* --- Textes --------------------------------------------------------------- */
   currencyLabel: "FCFA",
-  whatsappIntro: "Bonjour, je souhaite passer une commande :",
-  depositNote: "Un acompte de 50% est demandé pour lancer la confection.",
-  measurementsNote: "Je vous envoie juste après mes mensurations et une photo entière pour la coupe.",
+  /* Message WhatsApp envoyé par la cliente. {nom} est remplacé par son nom. */
+  whatsappHello: "Bonjour, je m'appelle {nom}.",
+  whatsappIntro: "Ces modèles m'intéressent :",
+  whatsappQuestion: "Comment procède-t-on pour la commande ?",
+  /* Utilisée quand un modèle est "Prix sur demande" */
+  whatsappQuestionAsk: "Pouvez-vous m'indiquer le prix des modèles sur demande et m'expliquer comment procéder pour la commande ?",
 };

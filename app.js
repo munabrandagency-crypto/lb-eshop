@@ -328,7 +328,7 @@
       box.innerHTML =
         '<div class="done">' +
           "<h2>Votre commande est prête</h2>" +
-          "<p>WhatsApp s'est ouvert avec le récapitulatif. Envoyez le message, puis vos mensurations : la boutique vous répond pour confirmer.</p>" +
+          "<p>WhatsApp s'est ouvert avec votre sélection. Envoyez le message : la boutique vous répond pour vous guider, des mensurations à l'acompte.</p>" +
           '<a class="btn btn--wine btn--block" href="' + esc(state.lastWaUrl) + '" target="_blank" rel="noopener">' + ICON.wa + "Rouvrir WhatsApp</a>" +
           '<a class="btn btn--line btn--block" href="#" data-nav="accueil" data-reset-done>Retour à la collection</a>' +
         "</div>";
@@ -402,13 +402,16 @@
 
   function lineText(i) { return i.nom + " — " + i.quantite + " x " + priceText(i.prix); }
 
+  /* Message écrit comme une cliente : présentation, sélection, question ouverte.
+     Les étapes (mensurations, acompte) sont expliquées par la boutique dans sa réponse. */
   function waMessage(form) {
-    var totalLine = "Total : " + totalText();
-    if (cartHasAsk()) totalLine += " (prix à confirmer pour les modèles sur demande)";
-    return [C.whatsappIntro || "Bonjour, je souhaite passer une commande :", "", "Nom : " + form.nom, ""]
+    var hello = (C.whatsappHello || "Bonjour, je m'appelle {nom}.").replace("{nom}", form.nom);
+    var question = cartHasAsk()
+      ? (C.whatsappQuestionAsk || "Pouvez-vous m'indiquer le prix des modèles sur demande et m'expliquer comment procéder pour la commande ?")
+      : (C.whatsappQuestion || "Comment procède-t-on pour la commande ?");
+    return [hello, C.whatsappIntro || "Ces modèles m'intéressent :", ""]
       .concat(state.cart.map(function (i) { return "• " + lineText(i); }))
-      .concat(["", totalLine, "", C.depositNote, C.measurementsNote])
-      .filter(function (l) { return l != null; })
+      .concat(["", "Total : " + totalText(), "", question])
       .join("\n");
   }
 
