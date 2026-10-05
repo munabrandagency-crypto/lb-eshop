@@ -790,6 +790,31 @@ main {
 
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
+.social {
+  margin-top: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.social__label { width: 100%; text-align: center; font-size: 13px; color: var(--sable); margin: 0 0 2px; }
+.social { flex-wrap: wrap; }
+.social a {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--wine);
+  background: var(--surface, #fffdf9);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background 200ms, color 200ms, transform 200ms;
+}
+.social a:hover { background: var(--wine); color: #fffdf9; }
+.social a:active { transform: scale(.94); }
+.social svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.social:not([hidden]) + .foot { margin-top: 24px; }
+
 .foot {
   margin-top: 56px;
   padding-top: 18px;

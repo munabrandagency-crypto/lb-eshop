@@ -29,6 +29,14 @@ window.BOUTIQUE_CONFIG = {
   /* --- WhatsApp : format international, sans "+" ni espaces ------------- */
   whatsappNumber: "237650068716",
 
+  /* --- Réseaux sociaux : adresse complète de chaque profil ----------------
+     Exemple : "https://www.instagram.com/ellebelle237". Laisser "" pour masquer l'icône. */
+  reseaux: {
+    instagram: "",
+    tiktok: "",
+    facebook: ""
+  },
+
   /* --- Meta Pixel : laisser "" pour désactiver --------------------------- */
   metaPixelId: "",
 

@@ -103,6 +103,23 @@
     if (ht) ht.textContent = C.heroTitle || "Des pièces coupées à vos mesures";
     var hx = $("[data-hero-text]");
     if (hx) hx.textContent = C.heroText || "";
+    applyReseaux(name);
+  }
+
+  /* Liens vers les profils Instagram, TikTok, Facebook (config.reseaux) */
+  function applyReseaux(name) {
+    var box = $("[data-reseaux]"), R = C.reseaux || {};
+    if (!box) return;
+    var defs = [
+      ["instagram", "Instagram", '<rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.6"/><path d="M16.8 7.2v.01"/>'],
+      ["tiktok", "TikTok", '<path d="M14 4v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 4c.4 2.6 2.2 4.3 5 4.5"/>'],
+      ["facebook", "Facebook", '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M15 8.5h-1.5A1.5 1.5 0 0 0 12 10v10M10 13h5"/>']
+    ];
+    var html = defs.filter(function (d) { return /^https?:\/\//i.test(String(R[d[0]] || "").trim()); }).map(function (d) {
+      return '<a href="' + esc(String(R[d[0]]).trim()) + '" target="_blank" rel="noopener" aria-label="' + esc(name + " sur " + d[1]) + '">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' + d[2] + "</svg></a>";
+    }).join("");
+    if (html) { box.innerHTML = '<p class="social__label">Suivez-nous</p>' + html; box.hidden = false; }
   }
 
   /* ------------------------------------------------------------------ *
