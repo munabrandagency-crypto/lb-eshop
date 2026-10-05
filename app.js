@@ -75,7 +75,7 @@
 
   function applyIdentity() {
     var name = C.shopName || "Boutique";
-    document.title = name + " | Couture sur-mesure";
+    document.title = name + " | Vêtements confectionnés sur commande";
     $$("[data-shop-name]").forEach(function (el) { el.textContent = name; });
     var foot = $("[data-shop-name-foot]");
     if (foot) foot.textContent = name;

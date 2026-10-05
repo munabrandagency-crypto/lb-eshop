@@ -9,8 +9,8 @@
 window.BOUTIQUE_CONFIG = {
 
   /* --- Identité --------------------------------------------------------- */
-  shopName: "LB eShop",
-  tagline: "Couture sur-mesure pour femmes, au Cameroun",
+  shopName: "Elle è Belle",
+  tagline: "Vêtements pour femmes, confectionnés sur commande",
   heroTitle: "Des pièces coupées à vos mesures",
   heroText: "Choisissez vos modèles et envoyez votre sélection sur WhatsApp. La boutique vous guide ensuite pour les mensurations, puis lance la confection.",
 
