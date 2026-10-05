@@ -7,7 +7,25 @@
   "use strict";
 
   var C = window.BOUTIQUE_CONFIG || {};
-  var KEYS = { cart: "boutique_panier_v2", fav: "boutique_favoris_v1", consent: "boutique_consentement_mesure", lead: "boutique_demande_id" };
+  var KEYS = { cart: "boutique_panier_v2", fav: "boutique_favoris_v1", consent: "boutique_consentement_mesure", lead: "boutique_demande_id", source: "boutique_source" };
+
+  /* Source de la visite : lien partagé avec ?src=instagram, ?src=qr...
+     Première source retenue 60 jours, envoyée dans la colonne "source" des demandes. */
+  (function captureSource() {
+    try {
+      var m = location.search.match(/[?&](?:src|utm_source|ref)=([^&]+)/);
+      var src = m ? decodeURIComponent(m[1]).toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40) : "";
+      var saved = JSON.parse(localStorage.getItem(KEYS.source) || "null");
+      var fresh = saved && Date.now() - saved.t < 60 * 864e5;
+      if (src && !fresh) localStorage.setItem(KEYS.source, JSON.stringify({ s: src, t: Date.now() }));
+    } catch (e) { /* stockage indisponible */ }
+  })();
+  function currentSource() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(KEYS.source) || "null");
+      return saved && Date.now() - saved.t < 60 * 864e5 ? saved.s : "direct";
+    } catch (e) { return "direct"; }
+  }
   var ASK = "Prix sur demande";
 
   var state = {
@@ -467,6 +485,7 @@
       detailCommande: state.cart.map(lineText).join(" | "),
       total: cartHasAsk() ? totalText() : cartTotal(),
       consentementMarketing: form.marketing ? "oui" : "non",
+      source: currentSource(),
     });
     /* sendBeacon survit au passage vers WhatsApp sur mobile ; fetch en secours */
     var sent = false;
