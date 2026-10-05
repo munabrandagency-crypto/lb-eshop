@@ -24,6 +24,6 @@ window.ESPACE_CONFIG = {
   /* Accompagnement : à compléter (nom de l'agence et numéro WhatsApp du support) */
   support: {
     nom: "Muna Brand Services",
-    whatsapp: ""
+    whatsapp: "237656964073"
   }
 };
