@@ -186,6 +186,23 @@
     .note b { color: var(--ink-soft); font-weight: 600; }
     .section-title { margin: 6px 4px 0; font-size: 15px; font-weight: 600; }
 
+    /* ---------- Affiliées ---------- */
+    .aff { display: grid; gap: 12px; }
+    .aff__head { display: flex; gap: 12px; align-items: center; }
+    .aff__head .link__ic { background: linear-gradient(160deg, var(--wine), var(--wine-deep)); color: var(--brass-light); }
+    .aff__head b { display: block; font-size: 15px; }
+    .aff__head span { font-size: 12.5px; color: var(--sable); }
+    .field-pill { display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: 999px; padding: 0 6px 0 16px; height: 50px; }
+    .field-pill input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 15px; height: 100%; }
+    .field-pill input::placeholder { color: #a39585; }
+    .aff__result { display: grid; gap: 10px; animation: in 320ms var(--ease) both; }
+    .aff__code { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--tint); border-radius: 14px; padding: 10px 12px 10px 14px; }
+    .aff__code small { display: block; font-size: 11.5px; color: var(--sable); }
+    .aff__code strong { font: 600 17px/1.2 var(--sans); letter-spacing: .06em; color: var(--wine); }
+    .aff__url { font-size: 12px; color: var(--sable); overflow-wrap: anywhere; margin: 0 4px; }
+    .aff__qr { width: 92px; height: 92px; flex: none; background: #fff; border-radius: 10px; padding: 6px; box-shadow: inset 0 0 0 1px var(--line); }
+    .aff__qr svg { display: block; width: 100%; height: 100%; }
+
     /* ---------- Guides ---------- */
     .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }
     .page-head h1 { margin: 0; font: 500 28px/1.1 var(--serif); letter-spacing: -0.01em; }
@@ -389,6 +406,30 @@
         <h2 class="section-title">Vos liens</h2>
         <div class="links" data-links></div>
         <p class="note">Dans votre feuille <b>Mes demandes</b>, la colonne <b>source</b> indique le lien utilisé par chaque cliente.</p>
+
+        <h2 class="section-title">Vos affiliées</h2>
+        <section class="panel aff" aria-label="Créer le lien d'une affiliée">
+          <div class="aff__head">
+            <span class="link__ic"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><path d="M17 8v6M14 11h6"/></svg></span>
+            <span><b>Lien personnel d'une affiliée</b><span>Chaque cliente qu'elle vous envoie est comptée à son nom.</span></span>
+          </div>
+          <label class="field-pill">
+            <input type="text" placeholder="Prénom de l'affiliée, ex. Marie" maxlength="30" autocomplete="off" data-aff-input aria-label="Prénom ou code de l'affiliée">
+          </label>
+          <div class="aff__result" data-aff-result hidden>
+            <div class="aff__code">
+              <span><small>Son code</small><strong data-aff-code></strong></span>
+              <div class="aff__qr" data-aff-qr aria-label="QR code de l'affiliée"></div>
+            </div>
+            <p class="aff__url" data-aff-url></p>
+            <div class="btn-row">
+              <button type="button" class="pill-btn" data-aff-copy>Copier le lien</button>
+              <button type="button" class="pill-btn pill-btn--light" data-aff-send>Lui envoyer</button>
+              <button type="button" class="pill-btn pill-btn--light" data-aff-qrdl>QR code</button>
+            </div>
+          </div>
+          <p class="note">Les ventes de chaque affiliée se comptent dans l'onglet <b>Affiliées</b> de Mes demandes. Les clientes peuvent aussi taper son code dans le formulaire.</p>
+        </section>
       </div>
     </div>
   </section>
@@ -625,6 +666,47 @@
     toast("QR code téléchargé");
   }
 
+  /* ---------- affiliées ---------- */
+  function codeAff(v) { return sansAccent(v).toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20); }
+  function lienAff(code) { return base + "?aff=" + encodeURIComponent(code); }
+  var affQr = null, affCode = "";
+  function majAffiliee() {
+    affCode = codeAff($("[data-aff-input]").value);
+    var box = $("[data-aff-result]");
+    if (!affCode) { box.hidden = true; return; }
+    box.hidden = false;
+    $("[data-aff-code]").textContent = affCode;
+    $("[data-aff-url]").textContent = lienAff(affCode).replace(/^https?:\/\//, "");
+    if (window.qrcode) {
+      affQr = window.qrcode(0, "M"); affQr.addData(lienAff(affCode)); affQr.make();
+      $("[data-aff-qr]").innerHTML = affQr.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+    }
+  }
+  function messageAffiliee() {
+    return "Bonjour ! Voici ton lien personnel " + (E.nom || "") + " : " + lienAff(affCode) + "\n\n" +
+      "Partage-le avec tes contacts. Chaque cliente qui passe par ce lien, ou qui indique le code " + affCode +
+      " dans le formulaire, est comptée à ton nom.";
+  }
+  function telechargerQrAff() {
+    if (!affQr) return;
+    var n = affQr.getModuleCount(), cell = 24, marge = 4 * cell, taille = n * cell + marge * 2, bas = 240;
+    var cv = document.createElement("canvas"); cv.width = taille; cv.height = taille + bas;
+    var g = cv.getContext("2d");
+    g.fillStyle = "#ffffff"; g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = "#1c1410";
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (affQr.isDark(r, c)) g.fillRect(marge + c * cell, marge + r * cell, cell, cell);
+    g.textAlign = "center";
+    g.fillStyle = "#6b1f2a"; g.font = 'italic 500 84px Fraunces, Georgia, serif'; g.fillText(E.nom || "", taille / 2, taille + 70);
+    g.fillStyle = "#4a3c33"; g.font = '500 40px "Work Sans", system-ui, sans-serif'; g.fillText("Scannez pour voir le catalogue", taille / 2, taille + 135);
+    g.fillStyle = "#b08d57"; g.font = '600 40px "Work Sans", system-ui, sans-serif'; g.fillText("Code " + affCode, taille / 2, taille + 195);
+    var a = document.createElement("a");
+    a.href = cv.toDataURL("image/png");
+    a.download = "qr-" + affCode.toLowerCase() + ".png";
+    document.body.appendChild(a); a.click(); a.remove();
+    toast("QR code de " + affCode + " téléchargé");
+  }
+  $("[data-aff-input]").addEventListener("input", majAffiliee);
+
   /* ---------- guides ---------- */
   var CATS = { catalogue: "Catalogue", clientes: "Clientes", factures: "Factures" };
   var GUIDES = [
@@ -661,6 +743,12 @@
                "Dans <b>Enregistrer un paiement</b>, touchez <b>Acompte</b> ou <b>Solde</b> : le montant se calcule seul. Choisissez le mode (Orange Money, MTN MoMo, espèces…).",
                "Touchez <b>Enregistrer et générer le reçu</b>."],
       astuce: "Quand le reste à payer tombe à zéro, la commande passe en <b>Soldée</b>. Les reçus sont aussi rangés dans un dossier commun pour vos comptes du mois.", outil: "comptabilite", cta: "Ouvrir Factures & reçus" },
+    { id: "affiliee", cat: "clientes", icon: "megaphone", titre: "Lancer une affiliée", lead: "Une personne vend pour vous, vous savez exactement ce qu'elle rapporte.",
+      etapes: ["Fixez par écrit les règles avec elle : taux de commission, payée sur les commandes <b>soldées</b>, versée chaque mois.",
+               "Onglet <b>Partager</b>, rubrique <b>Vos affiliées</b> : tapez son prénom, puis <b>Lui envoyer</b>. Elle reçoit son lien et son code.",
+               "Ses clientes arrivent par son lien ou tapent son code : la colonne <b>affilie</b> de Mes demandes se remplit, et son code apparaît dans le message WhatsApp.",
+               "En fin de mois, onglet <b>Affiliées</b> de Mes demandes : choisissez le mois en B3, lisez sa commission, vérifiez avec les factures."],
+      astuce: "Envoyez à chaque affiliée uniquement ses propres chiffres : la feuille contient les coordonnées de vos clientes.", outil: "#partager", cta: "Créer un lien d'affiliée" },
     { id: "annoncer", cat: "clientes", icon: "megaphone", titre: "Annoncer votre catalogue", lead: "Les bons liens aux bons endroits.",
       etapes: ["Mettez le lien <b>Instagram</b> dans votre bio.",
                "Publiez le lien <b>WhatsApp</b> en statut, avec une photo de votre plus beau modèle.",
@@ -802,6 +890,14 @@
     var cp = t.closest("[data-copy-src]");
     if (cp) { copier(lien(cp.getAttribute("data-copy-src")), cp); return; }
     if (t.closest("[data-qr-download]")) { telechargerQr(); return; }
+    if (t.closest("[data-aff-copy]")) { copier(lienAff(affCode)); return; }
+    if (t.closest("[data-aff-qrdl]")) { telechargerQrAff(); return; }
+    if (t.closest("[data-aff-send]")) {
+      var msg = messageAffiliee();
+      if (navigator.share) navigator.share({ text: msg }).catch(function () {});
+      else window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank", "noopener");
+      return;
+    }
     if (t.closest("[data-native-share]")) { navigator.share({ title: E.nom, text: "Découvrez nos modèles", url: lien("partage") }).catch(function () {}); return; }
     if (t.closest("[data-install]") && installEvt) { installEvt.prompt(); installEvt = null; $("[data-install]").hidden = true; return; }
     var f = t.closest("[data-filtre]");

@@ -37,6 +37,11 @@ window.BOUTIQUE_CONFIG = {
     facebook: ""
   },
 
+  /* --- Affiliation ---------------------------------------------------------
+     Lien d'une affiliée : adresse du catalogue + ?aff=PRENOM (généré dans l'Espace).
+     true = champ « Code de parrainage » dans le formulaire (prérempli par le lien). */
+  codeParrainage: true,
+
   /* --- Meta Pixel : laisser "" pour désactiver --------------------------- */
   metaPixelId: "",
 

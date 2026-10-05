@@ -7,19 +7,32 @@
   "use strict";
 
   var C = window.BOUTIQUE_CONFIG || {};
-  var KEYS = { cart: "boutique_panier_v2", fav: "boutique_favoris_v1", consent: "boutique_consentement_mesure", lead: "boutique_demande_id", source: "boutique_source" };
+  var KEYS = { cart: "boutique_panier_v2", fav: "boutique_favoris_v1", consent: "boutique_consentement_mesure", lead: "boutique_demande_id", source: "boutique_source", aff: "boutique_affiliee" };
 
   /* Source de la visite : lien partagé avec ?src=instagram, ?src=qr...
      Première source retenue 60 jours, envoyée dans la colonne "source" des demandes. */
   (function captureSource() {
     try {
-      var m = location.search.match(/[?&](?:src|utm_source|ref)=([^&]+)/);
+      var m = location.search.match(/[?&](?:src|utm_source)=([^&]+)/);
       var src = m ? decodeURIComponent(m[1]).toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40) : "";
       var saved = JSON.parse(localStorage.getItem(KEYS.source) || "null");
       var fresh = saved && Date.now() - saved.t < 60 * 864e5;
       if (src && !fresh) localStorage.setItem(KEYS.source, JSON.stringify({ s: src, t: Date.now() }));
+      /* Affiliée : ?aff=MARIE (ou ?ref=MARIE). Le dernier lien d'affiliée cliqué compte, 30 jours. */
+      var a = location.search.match(/[?&](?:aff|ref)=([^&]+)/);
+      var code = a ? normCode(decodeURIComponent(a[1])) : "";
+      if (code) localStorage.setItem(KEYS.aff, JSON.stringify({ a: code, t: Date.now() }));
     } catch (e) { /* stockage indisponible */ }
   })();
+  function normCode(v) {
+    return String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20);
+  }
+  function currentAff() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(KEYS.aff) || "null");
+      return saved && Date.now() - saved.t < 30 * 864e5 ? saved.a : "";
+    } catch (e) { return ""; }
+  }
   function currentSource() {
     try {
       var saved = JSON.parse(localStorage.getItem(KEYS.source) || "null");
@@ -394,6 +407,9 @@
           '<input id="f-tel" name="telephone" type="tel" inputmode="tel" autocomplete="tel" placeholder="6XX XX XX XX" required></div>' +
         '<div class="field"><label for="f-mail">Email (facultatif)</label>' +
           '<input id="f-mail" name="email" type="email" autocomplete="email"></div>' +
+        (C.codeParrainage === false ? "" :
+        '<div class="field"><label for="f-code">Code de parrainage (facultatif)</label>' +
+          '<input id="f-code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" value="' + esc(currentAff()) + '"></div>') +
         '<label class="check"><input type="checkbox" name="consentement" required>' +
           "<span>J'accepte que la boutique enregistre ces informations et me recontacte sur WhatsApp au sujet de ma sélection.</span></label>" +
         '<label class="check"><input type="checkbox" name="marketing">' +
@@ -414,8 +430,10 @@
     return {
       nom: e.namedItem("nom").value, telephone: e.namedItem("telephone").value, email: e.namedItem("email").value,
       consentement: e.namedItem("consentement").checked, marketing: e.namedItem("marketing").checked,
+      code: codeFrom(e),
     };
   }
+  function codeFrom(e) { var c = e.namedItem("code"); return normCode(c ? c.value : currentAff()); }
 
   function restoreForm(v) {
     if (!v) return;
@@ -425,6 +443,7 @@
     e.namedItem("email").value = v.email;
     e.namedItem("consentement").checked = v.consentement;
     e.namedItem("marketing").checked = v.marketing;
+    if (v.code && e.namedItem("code")) e.namedItem("code").value = v.code;
   }
 
   /* ------------------------------------------------------------------ *
@@ -447,7 +466,9 @@
       : (C.whatsappQuestion || "Comment procède-t-on pour la commande ?");
     return [hello, C.whatsappIntro || "Ces modèles m'intéressent :", ""]
       .concat(state.cart.map(function (i) { return "• " + lineText(i); }))
-      .concat(["", "Total : " + totalText(), "", question])
+      .concat(["", "Total : " + totalText()])
+      .concat(form.code ? ["Code de parrainage : " + form.code] : [])
+      .concat(["", question])
       .join("\n");
   }
 
@@ -480,7 +501,7 @@
       if (!form.consentement || !form.nom.trim() || !validPhone(form.telephone) || !state.cart.length) return;
       var clean = {
         nom: form.nom.trim(), telephone: form.telephone.trim(), email: form.email.trim(),
-        marketing: form.marketing,
+        marketing: form.marketing, code: form.code,
       };
       var sig = JSON.stringify([clean, state.cart]);
       if (sig === lastLeadSig) return;
@@ -503,6 +524,7 @@
       total: cartHasAsk() ? totalText() : cartTotal(),
       consentementMarketing: form.marketing ? "oui" : "non",
       source: currentSource(),
+      affilie: form.code || "",
     });
     /* sendBeacon survit au passage vers WhatsApp sur mobile ; fetch en secours */
     var sent = false;
@@ -526,6 +548,7 @@
       email: e.namedItem("email").value.trim(),
       consentement: e.namedItem("consentement").checked,
       marketing: e.namedItem("marketing").checked,
+      code: codeFrom(e),
     };
 
     $$("input", f).forEach(function (i) { i.removeAttribute("aria-invalid"); });
