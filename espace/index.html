@@ -300,7 +300,7 @@
       <a class="btn btn--line" data-support-link target="_blank" rel="noopener">Écrire au support</a>
     </section>
 
-    <p class="foot">Cette page est réservée à <span data-nom>Elle è Belle</span>. Gardez son adresse pour vous.</p>
+    <p class="foot">Cette page est réservée à <span data-nom>Elle è Belle</span>. Gardez son adresse pour vous.<span data-signature hidden><br>Catalogue conçu et accompagné par <b data-agence></b>.</span></p>
   </div>
 
   <div class="toast" role="status" aria-live="polite"></div>
@@ -374,6 +374,7 @@
     /* --- Support ------------------------------------------------------- */
     var s = E.support || {};
     var tel = String(s.whatsapp || "").replace(/\D/g, "");
+    if (s.nom) { $("[data-signature]").hidden = false; $("[data-agence]").textContent = s.nom; }
     if (tel) {
       $("[data-support]").hidden = false;
       $("[data-support-nom]").textContent = s.nom || "Votre conseiller";
